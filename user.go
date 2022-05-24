@@ -27,6 +27,7 @@ func NewUser(conn net.Conn, server *Server) *User {
 	return user
 }
 
+// 用户上线，信息存入 server.OnlineMap
 func (this *User) Online() {
 
 	// 用户上线，将用户加入 OnlineMap 中
@@ -38,6 +39,7 @@ func (this *User) Online() {
 	this.server.BroadCast(this, "已上线")
 }
 
+// 用户下线，信息从 server.OnlineMap 移出
 func (this *User) Offline() {
 
 	// 用户下线，将用户从 OnlineMap 中删除
@@ -49,14 +51,28 @@ func (this *User) Offline() {
 	this.server.BroadCast(this, "下线")
 }
 
+// 当前用户下显示内容
+func (this *User) SendMsg(msg string) {
+	this.conn.Write([]byte(msg + "\n"))
+}
+
 func (this *User) DoMessage(msg string) {
-	this.server.BroadCast(this, msg)
+	if msg == "who" {
+		this.server.mapLock.Lock()
+		for _, user := range this.server.OnlineMap {
+			onlineUser := "[" + user.Addr + "]" + user.Name + ":" + "在线"
+			this.SendMsg(onlineUser)
+		}
+		this.server.mapLock.Unlock()
+	} else {
+		this.server.BroadCast(this, msg)
+	}
 }
 
 func (this *User) ListenMessage() {
 	for {
 		msg := <-this.C
 
-		this.conn.Write([]byte(msg + "\n"))
+		this.SendMsg(msg)
 	}
 }
