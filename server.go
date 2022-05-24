@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -58,6 +59,8 @@ func (this *Server) Handler(conn net.Conn) {
 
 	user.Online()
 
+	isLive := make(chan bool)
+
 	// 接收用户发送的消息
 	go func() {
 		buf := make([]byte, 4096)
@@ -78,11 +81,29 @@ func (this *Server) Handler(conn net.Conn) {
 			msg := string(buf[:n-1])
 
 			user.DoMessage(msg)
+
+			isLive <- true
 		}
 	}()
 
-	// 阻塞当前 handler，B友说不写也没关系。没明白是什么道理
-	select {}
+	for {
+		select {
+		case <-isLive:
+			//	当前用户活跃，重置定时器
+
+		case <-time.After(10 * time.Second):
+			//	已经超时，强制踢出当前客户端
+			user.SendMsg("你被踢了")
+
+			// 释放资源
+			close(user.C)
+
+			// 关闭连接
+			conn.Close()
+
+			return
+		}
+	}
 }
 
 func (this *Server) Start() {
